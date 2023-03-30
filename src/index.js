@@ -20,19 +20,20 @@ let gallery = new simpleLightbox('.gallery a', {
 
 
 const setBg = async (value) => {
-    const ApiRes = await pixabayApi.getByID(value);
-    bodyEl.style.backgroundImage = `url(${ApiRes.data.hits[0].largeImageURL})`;
-    bodyEl.style.backgroundRepeat = `no-repeat`;
-    bodyEl.style.backgroundPosition = `50 % 50 %`;
-    bodyEl.style.backgroundAttachment = `fixed`;
-    bodyEl.style.backgroundSize = `cover`;
+    try {
+        const resault = await pixabayApi.getByID(value);
+        bodyEl.style.backgroundImage = `url(${resault.data.hits[0].largeImageURL})`;
+        bodyEl.style.backgroundRepeat = `no-repeat`;
+        bodyEl.style.backgroundPosition = `50 % 50 %`;
+        bodyEl.style.backgroundAttachment = `fixed`;
+        bodyEl.style.backgroundSize = `cover`;
+
+    } catch (error) {
+        console.log(`Background load fail: ${error.message}`)
+    }
 };
 
-try {
-    setBg(2529172)
-} catch (error) {
-    console.log(error)
-}
+setBg(2529172);
 
 
 const formListener = formEl.addEventListener('submit', onFormSubmit)
@@ -42,6 +43,7 @@ async function onFormSubmit(ev) {
     ev.preventDefault();
     gallaryDiv.innerHTML = '';
     inputValue = ev.currentTarget.elements[0].value;
+    loadMoreBtn.style.display = `none`;
 
     window.removeEventListener("scroll", throtledhandleInfiniteScroll);
 
@@ -50,7 +52,6 @@ async function onFormSubmit(ev) {
         loadMoreBtn.style.display = `none`;
         return
     }
-
 
     const request = await createGallary(inputValue, 1);
 
@@ -61,8 +62,7 @@ async function onFormSubmit(ev) {
         return
     }
 
-    gallery.refresh()
-    Notiflix.Notify.success(`Hooray! We found ${request.data.totalHits} images.`)
+    Notiflix.Notify.success(`Hooray! We found ${request.data.totalHits} images.`);
 
     if (request.data.totalHits > 40) {
         if (checkEl.checked) {
@@ -81,20 +81,26 @@ async function onFormSubmit(ev) {
 async function createGallary(searchRequest, page) {
     pixabayApi.searchValue = searchRequest;
     pixabayApi.currentPage = page;
-    const ApiRes = await pixabayApi.getPhoto();
-    const markup = ApiRes.data.hits.map(({ webformatURL, largeImageURL, tags, likes, views, comments, downloads, id }) => `
+    let ApiRes;
+    try {
+        ApiRes = await pixabayApi.getPhoto();
+        const markup = ApiRes.data.hits.map(({ webformatURL, largeImageURL, tags, likes, views, comments, downloads, id }) => `
+        <a rel="noopener noreferrer" class="gallery__link" href="${largeImageURL}">
+                <img class="gallery__image" src="${webformatURL}" data-source="${largeImageURL}" alt="${tags}" loading="lazy" />
+            <div class="info">
+                <p class="info-item"><b>Likes: ${likes}</b></p>
+                <p class="info-item"><b>Views: ${views}</b></p>
+                <p class="info-item"><b>Comments: ${comments}</b></p>
+                <p class="info-item"><b>Downloads: ${downloads}</b></p>
+            </div>
+        </a>
+        `);
+        await gallaryDiv.insertAdjacentHTML('beforeEnd', markup.join(""));
 
-    <a rel="noopener noreferrer" class="gallery__link" href="${largeImageURL}">
-            <img class="gallery__image" src="${webformatURL}" data-source="${largeImageURL}" alt="${tags}" loading="lazy" />
-        <div class="info">
-            <p class="info-item"><b>Likes: ${likes}</b></p>
-            <p class="info-item"><b>Views: ${views}</b></p>
-            <p class="info-item"><b>Comments: ${comments}</b></p>
-            <p class="info-item"><b>Downloads: ${downloads}</b></p>
-        </div>
-    </a>
-    `);
-    gallaryDiv.insertAdjacentHTML('beforeEnd', markup.join(""));
+    } catch (error) {
+        console.log(error)
+    }
+    gallery.refresh();
     return ApiRes;
 }
 
@@ -119,16 +125,15 @@ async function onLoadMore(el) {
 const handleInfiniteScroll = async () => {
     const endOfPage = window.innerHeight + window.pageYOffset >= document.body.offsetHeight;
     if (endOfPage) {
-        ++pixabayApi.currentPage
+        ++pixabayApi.currentPage;
         const request = await createGallary(inputValue, pixabayApi.currentPage);
         if (!request.data.hits.length) {
             loadMoreBtn.style.display = `none`;
-            Notiflix.Notify.failure("We're sorry, but you've reached the end of search results.")
-
+            Notiflix.Notify.failure("We're sorry, but you've reached the end of search results.");
             window.removeEventListener("scroll", throtledhandleInfiniteScroll);
             return
         }
     }
 };
 
-const throtledhandleInfiniteScroll = throttle(handleInfiniteScroll, 300);
+const throtledhandleInfiniteScroll = throttle(handleInfiniteScroll, 200);
