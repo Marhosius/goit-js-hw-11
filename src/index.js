@@ -60,6 +60,8 @@ async function onFormSubmit(ev) {
     Notiflix.Notify.success(`Hooray! We found ${request.data.totalHits} images.`)
     loadMoreBtn.style.display = `block`;
     formEl.reset();
+
+
 };
 
 
@@ -92,5 +94,13 @@ async function onLoadMore(el) {
         return
     }
 
+    const { height: cardHeight } = gallaryDiv.firstElementChild.getBoundingClientRect();
+
+    window.scrollBy({
+        top: cardHeight * 2,
+        behavior: "smooth",
+    });
+
 }
+
 
