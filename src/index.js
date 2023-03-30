@@ -3,11 +3,13 @@ import Notiflix from 'notiflix';
 import simpleLightbox from 'simplelightbox';
 import "simplelightbox/dist/simple-lightbox.min.css";
 import { PixabayApi } from './js/fetchPhoto';
+import throttle from 'lodash.throttle';
 
 const formEl = document.querySelector('.search-form');
 const gallaryDiv = document.querySelector('.gallery');
 const loadMoreBtn = document.querySelector('.load-more');
 const bodyEl = document.querySelector('body');
+const checkEl = document.querySelector('.autoload_check');
 loadMoreBtn.style.display = `none`;
 
 const pixabayApi = new PixabayApi();
@@ -15,6 +17,7 @@ let inputValue = '';
 let gallery = new simpleLightbox('.gallery a', {
     captionsData: "title"
 });
+
 
 const setBg = async (value) => {
     const ApiRes = await pixabayApi.getByID(value);
@@ -39,13 +42,15 @@ async function onFormSubmit(ev) {
     ev.preventDefault();
     gallaryDiv.innerHTML = '';
     inputValue = ev.currentTarget.elements[0].value;
-    let subBtn = ev.currentTarget.elements[1];
+
+    window.removeEventListener("scroll", throtledhandleInfiniteScroll);
 
     if (!inputValue.trim()) {
         Notiflix.Notify.warning(`Enter some request to get started`)
         loadMoreBtn.style.display = `none`;
         return
     }
+
 
     const request = await createGallary(inputValue, 1);
 
@@ -58,10 +63,18 @@ async function onFormSubmit(ev) {
 
     gallery.refresh()
     Notiflix.Notify.success(`Hooray! We found ${request.data.totalHits} images.`)
-    loadMoreBtn.style.display = `block`;
+
+    if (request.data.totalHits > 40) {
+        if (checkEl.checked) {
+            let scrollListener = window.addEventListener("scroll", throtledhandleInfiniteScroll);
+            formEl.reset();
+            return
+        }
+        loadMoreBtn.style.display = `block`;
+        formEl.reset();
+        return
+    }
     formEl.reset();
-
-
 };
 
 
@@ -103,4 +116,19 @@ async function onLoadMore(el) {
 
 }
 
+const handleInfiniteScroll = async () => {
+    const endOfPage = window.innerHeight + window.pageYOffset >= document.body.offsetHeight;
+    if (endOfPage) {
+        ++pixabayApi.currentPage
+        const request = await createGallary(inputValue, pixabayApi.currentPage);
+        if (!request.data.hits.length) {
+            loadMoreBtn.style.display = `none`;
+            Notiflix.Notify.failure("We're sorry, but you've reached the end of search results.")
 
+            window.removeEventListener("scroll", throtledhandleInfiniteScroll);
+            return
+        }
+    }
+};
+
+const throtledhandleInfiniteScroll = throttle(handleInfiniteScroll, 300);
